@@ -1,4 +1,5 @@
 import pygame
+import math
 from game.world import TILE
 
 # Placeholder colors, we'll swap in real sprites later
@@ -68,4 +69,57 @@ def draw_message(screen, title, subtitle, color=(255, 255, 255)):
     t = get_font(96).render(title, True, color)
     s = get_font(36).render(subtitle, True, (220, 220, 220))
     screen.blit(t, t.get_rect(center=(cx, cy - 20)))
-    screen.blit(s, s.get_rect(center=(cx, cy + 50)))    
+    screen.blit(s, s.get_rect(center=(cx, cy + 50)))   
+
+
+def draw_hunter(screen, hunter):
+    rect = pygame.Rect(0, 0, 22, 22)
+    rect.center = (round(hunter.x), round(hunter.y))
+    pygame.draw.rect(screen, (200, 40, 40), rect)
+    pygame.draw.rect(screen, (0, 0, 0), rect, 2)
+
+
+def draw_debug(screen, hunter):
+    """Patrol points (blue rings) and the hunter's current A* path (orange line)."""
+    for (c, r) in hunter.patrol_points:
+        center = (c * TILE + TILE // 2, r * TILE + TILE // 2)
+        pygame.draw.circle(screen, (80, 160, 255), center, 6, 2)
+    if hunter.path:
+        pts = [(round(hunter.x), round(hunter.y))]
+        pts += [(c * TILE + TILE // 2, r * TILE + TILE // 2) for c, r in hunter.path]
+        if len(pts) > 1:
+            pygame.draw.lines(screen, (255, 140, 0), False, pts, 2)
+
+    if hunter.last_known_pos:
+        x, y = (round(v) for v in hunter.last_known_pos)
+        pygame.draw.line(screen, (255, 0, 255), (x - 6, y - 6), (x + 6, y + 6), 2)
+        pygame.draw.line(screen, (255, 0, 255), (x - 6, y + 6), (x + 6, y - 6), 2)       
+
+def draw_vision_cone(screen, hunter, world):
+    """Cone of rays, each one stopping at the first vision-blocking tile."""
+    cx, cy = hunter.x, hunter.y
+    half = math.radians(hunter.FOV_DEG) / 2
+    rays = 24
+    points = [(cx, cy)]
+    for i in range(rays + 1):
+        angle = hunter.facing - half + (2 * half) * i / rays
+        dist = 0
+        while dist < hunter.VISION_RANGE:
+            nd = dist + 4
+            px = cx + math.cos(angle) * nd
+            py = cy + math.sin(angle) * nd
+            if world.blocks_vision(int(px // TILE), int(py // TILE)):
+                break
+            dist = nd
+        points.append((cx + math.cos(angle) * dist, cy + math.sin(angle) * dist))
+
+    color = (255, 60, 60, 80) if hunter.sees_player else (255, 255, 120, 55)
+    overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+    pygame.draw.polygon(overlay, color, points)
+    screen.blit(overlay, (0, 0))
+
+
+def draw_alert_mark(screen, hunter):
+    if hunter.sees_player:
+        t = get_font(40).render("!", True, (255, 50, 50))
+        screen.blit(t, t.get_rect(center=(round(hunter.x), round(hunter.y) - 24)))            

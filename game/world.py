@@ -4,6 +4,7 @@ TILE = 32  # pixels per grid cell
 
 # Tiles the player/hunter can always walk on (the gate 'E' is conditional)
 WALKABLE = {".", "B", "S", "D"}
+VISION_BLOCKERS = {"T", "R", "C"}   # trees, rocks, cabin walls
 
 
 class World:
@@ -53,6 +54,11 @@ class World:
             return self.gate_open  # gate only passable once all keys are collected
         return tile in WALKABLE
 
+    
+    def blocks_vision(self, col, row):
+        return self.tile_at(col, row) in VISION_BLOCKERS
+
+    
     def collect_keys(self, player_rect):
         """Pick up any key the player is touching. Opens the gate at the last one."""
         for (c, r) in self.keys[:]:
