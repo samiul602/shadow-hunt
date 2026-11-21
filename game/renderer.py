@@ -94,7 +94,7 @@ def draw_debug(screen, hunter):
         x, y = (round(v) for v in hunter.last_known_pos)
         pygame.draw.line(screen, (255, 0, 255), (x - 6, y - 6), (x + 6, y + 6), 2)
         pygame.draw.line(screen, (255, 0, 255), (x - 6, y + 6), (x + 6, y - 6), 2) 
-        
+
     if hunter.last_heard_pos:
         x, y = (round(v) for v in hunter.last_heard_pos)
         pygame.draw.line(screen, (0, 255, 255), (x - 6, y - 6), (x + 6, y + 6), 2)
@@ -146,3 +146,18 @@ def draw_noise(screen, player, stone_noises):
         pygame.draw.circle(overlay, (120, 200, 255, 170), center, s["radius"], 2)
         pygame.draw.circle(overlay, (120, 200, 255, 230), center, 5)
     screen.blit(overlay, (0, 0))
+
+
+
+STATE_COLORS = {
+    "PATROL": (120, 200, 255),
+    "ALERT": (255, 190, 40),
+    "CHASE": (255, 60, 60),
+    "SEARCH": (255, 140, 0),
+    "RETURN": (160, 255, 160),
+}
+
+
+def draw_state_label(screen, hunter):
+    t = get_font(22).render(hunter.state, True, STATE_COLORS[hunter.state])
+    screen.blit(t, t.get_rect(center=(round(hunter.x), round(hunter.y) + 24)))

@@ -6,7 +6,7 @@ from ai.hunter import Hunter
 from game.renderer import (draw_world, draw_player, draw_stamina_bar,
                            draw_keys, draw_key_counter, draw_message,
                            draw_hunter, draw_debug, draw_vision_cone,
-                             draw_alert_mark, draw_noise)
+                             draw_alert_mark, draw_noise, draw_state_label)
 
 from game.player import Player
 
@@ -26,6 +26,7 @@ def main():
     STONE_RANGE = 200          # max throw distance (pixels)
     STONE_NOISE_RADIUS = 220   # how far a stone's noise carries
     won = False
+    caught = False
     hunter = Hunter(PATROL_POINTS[0], PATROL_POINTS, TILE)
     show_debug = True
     stone_noises = []
@@ -38,11 +39,15 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_r and won:
+
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_r and (won or caught):
                 world = World(map_path)   # restart
                 player = Player(world.spawn)
                 hunter = Hunter(PATROL_POINTS[0], PATROL_POINTS, TILE)
                 won = False
+                caught = False
+                stone_noises.clear()
+
             if event.type == pygame.KEYDOWN and event.key == pygame.K_F1:
                     show_debug = not show_debug  
 
@@ -58,7 +63,7 @@ def main():
         # 2. update 
         keys = pygame.key.get_pressed()
         player.update(dt, keys, world)  
-        if not won:
+        if not (won or caught):
             hunter.update(dt, world.is_walkable)
             hunter.perceive((player.pos.x, player.pos.y), world.blocks_vision)
             player_noise = []
@@ -69,10 +74,14 @@ def main():
                 s["ttl"] -= dt
             stone_noises[:] = [s for s in stone_noises if s["ttl"] > 0]
             hunter.hear(player_noise + stone_noises)
+            
+            if hunter.has_caught((player.pos.x, player.pos.y)):
+                caught = True
             keys = pygame.key.get_pressed()
             player.update(dt, keys, world)
             world.collect_keys(player.rect)
             tile = world.tile_at(player.rect.centerx // TILE, player.rect.centery // TILE)
+ 
             if world.gate_open and tile == "E":
                 won = True
 
@@ -86,6 +95,7 @@ def main():
              draw_debug(screen, hunter)
         draw_hunter(screen, hunter)
         draw_alert_mark(screen, hunter)
+        draw_state_label(screen, hunter)
         draw_stamina_bar(screen, player)
         draw_keys(screen, world)
         draw_key_counter(screen, world)
