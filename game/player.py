@@ -1,15 +1,17 @@
 import pygame
 from game.world import TILE
+from config import CFG
 
+_P = CFG["player"]
 
 class Player:
     SIZE = 20             # hitbox in pixels (smaller than a tile so gaps are passable)
-    WALK_SPEED = 120      # pixels / second
-    SPRINT_SPEED = 200
-    MAX_STAMINA = 100
-    DRAIN = 30            # stamina / second while sprinting
-    REGEN = 20            # stamina / second otherwise
-    RECOVER_AT = 25       # exhausted players must regain this much to sprint again
+    WALK_SPEED = _P["walk_speed"]
+    SPRINT_SPEED = _P["sprint_speed"]
+    MAX_STAMINA = _P["max_stamina"]
+    DRAIN = _P["stamina_drain"]
+    REGEN = _P["stamina_regen"]
+    RECOVER_AT = _P["recover_at"]
 
     def __init__(self, spawn_tile):
         col, row = spawn_tile
@@ -23,7 +25,8 @@ class Player:
         self.hidden = False
 
     def update(self, dt, keys, world):
-        # 1. read input -> direction vector
+
+               # 1. read input -> direction vector
         dx = (keys[pygame.K_d] or keys[pygame.K_RIGHT]) - (keys[pygame.K_a] or keys[pygame.K_LEFT])
         dy = (keys[pygame.K_s] or keys[pygame.K_DOWN]) - (keys[pygame.K_w] or keys[pygame.K_UP])
         if self.hidden:
@@ -35,7 +38,7 @@ class Player:
         if moving:
             direction = direction.normalize()  # so diagonals aren't faster
 
-        # 2. sprint / stamina
+                  # 2. sprint / stamina
         wants_sprint = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
         self.sprinting = bool(wants_sprint and moving and not self.exhausted and self.stamina > 0)
         if self.sprinting:
@@ -47,7 +50,7 @@ class Player:
             if self.exhausted and self.stamina >= self.RECOVER_AT:
                 self.exhausted = False
 
-        # 3. move one axis at a time, resolving collisions after each
+                   # 3. move one axis at a time, resolving collisions after each
         speed = self.SPRINT_SPEED if self.sprinting else self.WALK_SPEED
         self._move_axis(0, direction.x * speed * dt, world)
         self._move_axis(1, direction.y * speed * dt, world)
@@ -69,7 +72,7 @@ class Player:
         """How far the player's footsteps carry right now (pixels)."""
         if not self.moving:
             return 0
-        return 150 if self.sprinting else 50
+        return _P["noise_sprint"] if self.sprinting else _P["noise_walk"]
 
     
     def _move_axis(self, axis, amount, world):

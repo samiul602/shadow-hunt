@@ -1,0 +1,47 @@
+{
+  "player": {
+    "walk_speed": 120,
+    "sprint_speed": 200,
+    "max_stamina": 100,
+    "stamina_drain": 30,
+    "stamina_regen": 20,
+    "recover_at": 25,
+    "noise_walk": 50,
+    "noise_sprint": 150
+  },
+  "stone": {
+    "range": 200,
+    "noise_radius": 220,
+    "duration": 1.0
+  },
+  "hunter": {
+    "vision_range": 160,
+    "fov_deg": 90,
+    "hide_detect_dist": 24,
+    "speeds": { "PATROL": 90, "ALERT": 100, "CHASE": 140, "SEARCH": 100, "RETURN": 100 },
+    "wait_at_point": 1.0,
+    "look_around_time": 1.5,
+    "lose_sight_time": 1.0,
+    "search_time": 8.0,
+    "repath_time": 0.4,
+    "memory_time": 12.0,
+    "suspicion_decay": 0.1,
+    "new_noise_dist": 40
+  },
+  "utility": {
+    "commit_bonus": 0.10,
+    "chase_base": 0.80,
+    "chase_proximity": 0.20,
+    "chase_recent": 0.60,
+    "investigate_base": 0.10,
+    "investigate_sound": 0.80,
+    "investigate_suspicion": 0.25,
+    "investigate_pending": 0.45,
+    "investigate_cap": 0.75,
+    "search_base": 0.35,
+    "search_suspicion": 0.25,
+    "patrol_base": 0.20,
+    "patrol_calm": 0.15
+  },
+  "patrol_points": [[8, 5], [20, 5], [19, 11], [8, 13]]
+}

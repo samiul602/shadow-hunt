@@ -2,6 +2,9 @@ import math
 from ai import utility
 from ai.astar import astar
 from ai.perception import check_vision, hear_noises
+from config import CFG
+
+_H = CFG["hunter"]
 
 PATROL, ALERT, CHASE, SEARCH, RETURN = "PATROL", "ALERT", "CHASE", "SEARCH", "RETURN"
 
@@ -12,23 +15,23 @@ STATE_ACTION = {PATROL: utility.PATROL, RETURN: utility.PATROL, ALERT: utility.I
 
 class Hunter:
     # perception
-    VISION_RANGE = 160    # pixels (5 tiles)
-    FOV_DEG = 90          # total field of view in degrees
+    VISION_RANGE = _H["vision_range"]
+    FOV_DEG = _H["fov_deg"]
+    HIDE_DETECT_DIST = _H["hide_detect_dist"]
 
-    # speed per state (pixels / second)
-    SPEEDS = {PATROL: 90, ALERT: 100, CHASE: 140, SEARCH: 100, RETURN: 100}
+    # speed per state (pixels / second), keys are the state names
+    SPEEDS = _H["speeds"]
 
     # timers (seconds)
-    WAIT_AT_POINT = 1.0       # pause at each patrol point
-    LOOK_AROUND_TIME = 1.5    # pause while investigating a spot
-    LOSE_SIGHT_TIME = 1.0     # "recent contact" window after losing sight
-    SEARCH_TIME = 8.0         # hard limit for one search
-    REPATH_TIME = 0.4         # how often CHASE recomputes A*
-    MEMORY_TIME = 12.0        # memory of the player's position fades over this long
-    SUSPICION_DECAY = 0.1     # suspicion lost per second
-    NEW_NOISE_DIST = 40       # a noise this far from the current target retargets ALERT
-    # HIDE_DETECT_DIST = 40     # a hidden player is only noticed this close (pixels)
-    HIDE_DETECT_DIST = 24     # a hidden player is only noticed this close (pixels)
+    WAIT_AT_POINT = _H["wait_at_point"]
+    LOOK_AROUND_TIME = _H["look_around_time"]
+    LOSE_SIGHT_TIME = _H["lose_sight_time"]
+    SEARCH_TIME = _H["search_time"]
+    REPATH_TIME = _H["repath_time"]
+    MEMORY_TIME = _H["memory_time"]
+    SUSPICION_DECAY = _H["suspicion_decay"]
+    NEW_NOISE_DIST = _H["new_noise_dist"]
+    
     def __init__(self, start_tile, patrol_points, tile_size, hiding_spots=()):
         self.hiding_spots = list(hiding_spots)
         self.tile = tile_size
@@ -83,7 +86,7 @@ class Hunter:
     def has_caught(self, player_pos, radius=22):
         return math.hypot(self.x - player_pos[0], self.y - player_pos[1]) < radius
 
-    # ------------------------------------------------------------ perception
+    # ------- perception
     def perceive(self, player_pos, blocks_vision, player_hidden=False):
         """Look for the player. Remembers where they were last seen."""
         self.vision = check_vision((self.x, self.y), self.facing, player_pos,
@@ -218,7 +221,7 @@ class Hunter:
         self.patrol_index = min(range(len(self.patrol_points)), key=dist_to)
         self._plan_to(self.patrol_points[self.patrol_index], walkable)
 
-    # ------------------------------------------------------------ state behaviors
+    # ---------- state behaviors
     def _patrol(self, dt, walkable):
         if self.wait_timer > 0:
             self.wait_timer -= dt
@@ -279,7 +282,7 @@ class Hunter:
         else:
             self._set_state(PATROL, "Back on patrol route")
 
-    # ------------------------------------------------------------ movement
+    # ------------- movement
     def _nearest_walkable(self, tile, walkable, max_r=6):
         """If the wanted tile is blocked (e.g. a stone landed on a tree), find the closest free one."""
         for r in range(max_r + 1):

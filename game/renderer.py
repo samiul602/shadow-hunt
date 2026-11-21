@@ -169,6 +169,18 @@ def draw_state_label(screen, hunter):
 
 ACTION_ORDER = ["CHASE", "INVESTIGATE", "SEARCH", "PATROL"]
 
+ACTION_TEXT = {
+    "CHASE": "Chase player",
+    "INVESTIGATE": "Investigate noise",
+    "SEARCH": "Search last known position",
+    "PATROL": "Patrol / return to route",
+}
+
+
+def _reason_line(screen, label, value, color, x, y):
+    screen.blit(get_font(22).render(label, True, (190, 190, 190)), (x, y))
+    screen.blit(get_font(22).render(value, True, color), (x + 150, y))
+
 
 def draw_ai_panel(screen, hunter, x=990, y=90):
     white, grey = (255, 255, 255), (190, 190, 190)
@@ -197,7 +209,48 @@ def draw_ai_panel(screen, hunter, x=990, y=90):
         bar_color = (255, 220, 80) if picked else (110, 150, 200)
         pygame.draw.rect(screen, bar_color, (x + 110, y + 2, int(120 * min(score, 1.0)), 14))
         screen.blit(get_font(20).render(f"{score:.2f}", True, white), (x + 238, y))
-        y += 26    
+        y += 26   
+
+        
+
+            # reasoning: why the hunter decided what it did
+    y += 10
+    screen.blit(get_font(24).render("Reasoning", True, white), (x, y))
+    y += 28
+
+    YES, NO, DIM = (255, 220, 80), (150, 150, 150), (110, 110, 110)
+    v = hunter.vision or {}
+    in_range, in_fov = v.get("in_range", False), v.get("in_fov", False)
+    dist = v.get("distance")
+
+    if v.get("blocked"):
+        blocked = ("Yes", YES)
+    elif in_range and in_fov:
+        blocked = ("No", NO)
+    else:
+        blocked = ("not tested", DIM)   # line of sight is only checked for targets in range and in view
+
+    last_seen = "never" if hunter.last_known_pos is None else f"{hunter.time_since_seen:.1f} s ago"
+    noise = f"{hunter.heard['intensity']:.2f}" if hunter.heard else "none"
+
+    lines = [
+        ("Player visible", "Yes" if hunter.sees_player else "No", YES if hunter.sees_player else NO),
+        ("Distance", f"{dist:.0f} px" if dist is not None else "-", white),
+        ("In range", "Yes" if in_range else "No", YES if in_range else NO),
+        ("In field of view", "Yes" if in_fov else "No", YES if in_fov else NO),
+        ("Obstacle blocking", blocked[0], blocked[1]),
+        ("Player hidden", "Yes" if v.get("hidden") else "No", YES if v.get("hidden") else NO),
+        ("Noise heard", noise, YES if hunter.heard else NO),
+        ("Last seen", last_seen, white),
+    ]
+    for label, value, color in lines:
+        _reason_line(screen, label, value, color, x, y)
+        y += 22
+
+    y += 8
+    screen.blit(get_font(22).render("Selected action:", True, grey), (x, y))
+    y += 22
+    screen.blit(get_font(26).render(ACTION_TEXT[hunter.action], True, YES), (x, y)) 
 
 def draw_hint(screen, player, world):
     col, row = int(player.pos.x // TILE), int(player.pos.y // TILE)

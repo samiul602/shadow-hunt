@@ -1,8 +1,9 @@
 """Utility-based decision making: score every possible action (0..1), pick the highest."""
+from config import CFG
 
 CHASE, INVESTIGATE, SEARCH, PATROL = "CHASE", "INVESTIGATE", "SEARCH", "PATROL"
 
-COMMIT_BONUS = 0.10   # bonus for the action that matches the current FSM state (stops flip-flopping)
+U = CFG["utility"]
 
 
 def score_actions(inp, current_action):
@@ -20,25 +21,26 @@ def score_actions(inp, current_action):
     visible = 1.0 if inp["visible"] else 0.0
 
     # CHASE: strong when the player is visible; keeps going briefly after losing sight
-    chase = visible * (0.80 + 0.20 * inp["proximity"]) \
-        + (1.0 - visible) * inp["recent_contact"] * 0.60
+    chase = visible * (U["chase_base"] + U["chase_proximity"] * inp["proximity"]) \
+        + (1.0 - visible) * inp["recent_contact"] * U["chase_recent"]
 
     # INVESTIGATE: louder (closer) noise and more suspicion -> higher
     investigate = 0.0
     if inp["sound"] > 0:
-        investigate = 0.10 + 0.80 * inp["sound"] + 0.25 * inp["suspicion"]
+        investigate = (U["investigate_base"] + U["investigate_sound"] * inp["sound"]
+                       + U["investigate_suspicion"] * inp["suspicion"])
     if inp["pending_investigation"]:
-        investigate = max(investigate, 0.45)   # finish checking the spot
-    investigate = min(investigate, 0.75)       # a visible player (>= 0.8) always wins
+        investigate = max(investigate, U["investigate_pending"])   # finish checking the spot
+    investigate = min(investigate, U["investigate_cap"])           # a visible player always wins
 
     # SEARCH: fresh memory of where the player was, plus suspicion
-    search = inp["memory"] * (0.35 + 0.25 * inp["suspicion"])
+    search = inp["memory"] * (U["search_base"] + U["search_suspicion"] * inp["suspicion"])
 
     # PATROL: baseline, a little lower when suspicious
-    patrol = 0.20 + 0.15 * (1.0 - inp["suspicion"])
+    patrol = U["patrol_base"] + U["patrol_calm"] * (1.0 - inp["suspicion"])
 
     scores = {CHASE: chase, INVESTIGATE: investigate, SEARCH: search, PATROL: patrol}
-    scores[current_action] += COMMIT_BONUS
+    scores[current_action] += U["commit_bonus"]
     return scores
 
 

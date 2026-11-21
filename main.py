@@ -1,15 +1,16 @@
 import pygame
 from pathlib import Path
 from game.world import World, TILE
-
+from config import CFG
 from ai.hunter import Hunter
+from game.player import Player
 from game.renderer import (draw_world, draw_player, draw_stamina_bar,
                            draw_keys, draw_key_counter, draw_message,
                            draw_hunter, draw_debug, draw_vision_cone,
                            draw_alert_mark, draw_noise, draw_state_label,
                            draw_ai_panel, draw_hint)
 
-from game.player import Player
+
 
 WIDTH, HEIGHT = 1280, 720
 FPS = 60
@@ -23,9 +24,11 @@ def main():
     map_path = Path(__file__).parent / "maps" / "forest.txt"
     world = World(map_path)
     player = Player(world.spawn)
-    PATROL_POINTS = [(8, 5), (20, 5), (19, 11), (8, 13)]
-    STONE_RANGE = 200          # max throw distance (pixels)
-    STONE_NOISE_RADIUS = 220   # how far a stone's noise carries
+
+    PATROL_POINTS = [tuple(p) for p in CFG["patrol_points"]]   # JSON gives lists, we need tuples
+    STONE_RANGE = CFG["stone"]["range"]
+    STONE_NOISE_RADIUS = CFG["stone"]["noise_radius"]
+    STONE_DURATION = CFG["stone"]["duration"]
     won = False
     caught = False
     hunter = Hunter(PATROL_POINTS[0], PATROL_POINTS, TILE, world.hiding_spots)
@@ -57,8 +60,8 @@ def main():
                 offset = target - player.pos
                 if offset.length() > STONE_RANGE:
                     target = player.pos + offset.normalize() * STONE_RANGE
-                stone_noises.append({"pos": (target.x, target.y),
-                                    "radius": STONE_NOISE_RADIUS, "ttl": 0.5})
+                    stone_noises.append({"pos": (target.x, target.y),
+                            "radius": STONE_NOISE_RADIUS, "ttl": STONE_DURATION})
             
             if event.type == pygame.KEYDOWN and event.key == pygame.K_e and not (won or caught):
                 player.toggle_hide(world)    
