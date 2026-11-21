@@ -93,7 +93,12 @@ def draw_debug(screen, hunter):
     if hunter.last_known_pos:
         x, y = (round(v) for v in hunter.last_known_pos)
         pygame.draw.line(screen, (255, 0, 255), (x - 6, y - 6), (x + 6, y + 6), 2)
-        pygame.draw.line(screen, (255, 0, 255), (x - 6, y + 6), (x + 6, y - 6), 2)       
+        pygame.draw.line(screen, (255, 0, 255), (x - 6, y + 6), (x + 6, y - 6), 2) 
+        
+    if hunter.last_heard_pos:
+        x, y = (round(v) for v in hunter.last_heard_pos)
+        pygame.draw.line(screen, (0, 255, 255), (x - 6, y - 6), (x + 6, y + 6), 2)
+        pygame.draw.line(screen, (0, 255, 255), (x - 6, y + 6), (x + 6, y - 6), 2)      
 
 def draw_vision_cone(screen, hunter, world):
     """Cone of rays, each one stopping at the first vision-blocking tile."""
@@ -121,5 +126,23 @@ def draw_vision_cone(screen, hunter, world):
 
 def draw_alert_mark(screen, hunter):
     if hunter.sees_player:
-        t = get_font(40).render("!", True, (255, 50, 50))
-        screen.blit(t, t.get_rect(center=(round(hunter.x), round(hunter.y) - 24)))            
+        symbol, color = "!", (255, 50, 50)
+    elif hunter.heard:
+        symbol, color = "?", (255, 190, 40)
+    else:
+        return
+    t = get_font(40).render(symbol, True, color)
+    screen.blit(t, t.get_rect(center=(round(hunter.x), round(hunter.y) - 24)))    
+    
+            
+def draw_noise(screen, player, stone_noises):
+    """Rings showing how far the player's footsteps and thrown stones carry."""
+    overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+    if player.noise_radius > 0:
+        center = (round(player.pos.x), round(player.pos.y))
+        pygame.draw.circle(overlay, (255, 255, 255, 70), center, player.noise_radius, 2)
+    for s in stone_noises:
+        center = (round(s["pos"][0]), round(s["pos"][1]))
+        pygame.draw.circle(overlay, (120, 200, 255, 170), center, s["radius"], 2)
+        pygame.draw.circle(overlay, (120, 200, 255, 230), center, 5)
+    screen.blit(overlay, (0, 0))

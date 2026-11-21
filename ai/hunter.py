@@ -1,6 +1,7 @@
 import math
 from ai.perception import check_vision
 from ai.astar import astar
+from ai.perception import check_vision, hear_noises
 
 
 class Hunter:
@@ -22,6 +23,9 @@ class Hunter:
         self.vision = None           # latest check_vision() result
         self.sees_player = False
         self.last_known_pos = None   # memory: where the player was last seen
+        self.heard = None            # loudest noise heard this frame (or None)
+        self.last_heard_pos = None   # memory: where the last noise came from
+
 
     def tile_pos(self):
         return (int(self.x // self.tile), int(self.y // self.tile))
@@ -34,6 +38,11 @@ class Hunter:
         self.sees_player = self.vision["visible"]
         if self.sees_player:
             self.last_known_pos = player_pos
+    def hear(self, noises):
+        """Listen for noises. Remembers where the last one came from."""
+        self.heard = hear_noises((self.x, self.y), noises)
+        if self.heard:
+            self.last_heard_pos = self.heard["pos"]
 
 
     def update(self, dt, walkable):

@@ -19,6 +19,7 @@ class Player:
         self.stamina = self.MAX_STAMINA
         self.exhausted = False
         self.sprinting = False
+        self.moving = False
 
     def update(self, dt, keys, world):
         # 1. read input -> direction vector
@@ -26,6 +27,7 @@ class Player:
         dy = (keys[pygame.K_s] or keys[pygame.K_DOWN]) - (keys[pygame.K_w] or keys[pygame.K_UP])
         direction = pygame.Vector2(dx, dy)
         moving = direction.length() > 0
+        self.moving = moving
         if moving:
             direction = direction.normalize()  # so diagonals aren't faster
 
@@ -45,7 +47,15 @@ class Player:
         speed = self.SPRINT_SPEED if self.sprinting else self.WALK_SPEED
         self._move_axis(0, direction.x * speed * dt, world)
         self._move_axis(1, direction.y * speed * dt, world)
+    
+    @property
+    def noise_radius(self):
+        """How far the player's footsteps carry right now (pixels)."""
+        if not self.moving:
+            return 0
+        return 150 if self.sprinting else 50
 
+    
     def _move_axis(self, axis, amount, world):
         if amount == 0:
             return

@@ -62,3 +62,16 @@ def check_vision(viewer_pos, facing, target_pos, fov_deg, view_range, tile_size,
         "blocked": blocked,
         "visible": in_range and in_fov and not blocked,
     }
+def hear_noises(listener_pos, noises):
+    """
+    noises: list of dicts {"pos": (x, y), "radius": pixels}
+    Returns the loudest audible noise as {"pos", "intensity", "distance"}, or None.
+    """
+    best = None
+    for n in noises:
+        dist = math.hypot(n["pos"][0] - listener_pos[0], n["pos"][1] - listener_pos[1])
+        if dist <= n["radius"]:
+            intensity = 1 - dist / n["radius"]   # 1 = right next to it, 0 = at the edge
+            if best is None or intensity > best["intensity"]:
+                best = {"pos": n["pos"], "intensity": intensity, "distance": dist}
+    return best
