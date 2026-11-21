@@ -1,8 +1,13 @@
 import math
+from ai import utility
 from ai.astar import astar
 from ai.perception import check_vision, hear_noises
 
 PATROL, ALERT, CHASE, SEARCH, RETURN = "PATROL", "ALERT", "CHASE", "SEARCH", "RETURN"
+
+# which utility action each FSM state is carrying out
+STATE_ACTION = {PATROL: utility.PATROL, RETURN: utility.PATROL, ALERT: utility.INVESTIGATE,
+                CHASE: utility.CHASE, SEARCH: utility.SEARCH}
 
 
 class Hunter:
@@ -16,12 +21,16 @@ class Hunter:
     # timers (seconds)
     WAIT_AT_POINT = 1.0       # pause at each patrol point
     LOOK_AROUND_TIME = 1.5    # pause while investigating a spot
-    LOSE_SIGHT_TIME = 1.0     # keep chasing this long after losing sight
-    SEARCH_TIME = 8.0         # how long to search before giving up
+    LOSE_SIGHT_TIME = 1.0     # "recent contact" window after losing sight
+    SEARCH_TIME = 8.0         # hard limit for one search
     REPATH_TIME = 0.4         # how often CHASE recomputes A*
+    MEMORY_TIME = 12.0        # memory of the player's position fades over this long
+    SUSPICION_DECAY = 0.1     # suspicion lost per second
     NEW_NOISE_DIST = 40       # a noise this far from the current target retargets ALERT
-
-    def __init__(self, start_tile, patrol_points, tile_size):
+    # HIDE_DETECT_DIST = 40     # a hidden player is only noticed this close (pixels)
+    HIDE_DETECT_DIST = 24     # a hidden player is only noticed this close (pixels)
+    def __init__(self, start_tile, patrol_points, tile_size, hiding_spots=()):
+        self.hiding_spots = list(hiding_spots)
         self.tile = tile_size
         self.x = start_tile[0] * tile_size + tile_size / 2   # pixel position
         self.y = start_tile[1] * tile_size + tile_size / 2
@@ -36,17 +45,24 @@ class Hunter:
 
         # FSM
         self.state = PATROL
-        self.reason = "Patrolling"   # why we are in this state (for the AI panel later)
+        self.reason = "Patrolling"
+
+        # utility AI
+        self.scores = {utility.CHASE: 0.0, utility.INVESTIGATE: 0.0,
+                       utility.SEARCH: 0.0, utility.PATROL: 0.0}
+        self.action = utility.PATROL
+        self.suspicion = 0.0          # 0..1
 
         # perception + memory
         self.vision = None
         self.sees_player = False
-        self.last_known_pos = None   # where the player was last SEEN
-        self.heard = None            # loudest noise heard this frame (or None)
-        self.last_heard_pos = None   # where the last noise came from
+        self.last_known_pos = None    # where the player was last SEEN
+        self.time_since_seen = 999.0
+        self.memory_consumed = False  # True once we've already searched that memory
+        self.heard = None             # loudest noise heard this frame (or None)
+        self.last_heard_pos = None
 
         # state-specific data
-        self.lost_sight_timer = 0.0
         self.repath_timer = 0.0
         self.alert_target = None
         self.alert_arrived = False
@@ -68,10 +84,14 @@ class Hunter:
         return math.hypot(self.x - player_pos[0], self.y - player_pos[1]) < radius
 
     # ------------------------------------------------------------ perception
-    def perceive(self, player_pos, blocks_vision):
+    def perceive(self, player_pos, blocks_vision, player_hidden=False):
         """Look for the player. Remembers where they were last seen."""
         self.vision = check_vision((self.x, self.y), self.facing, player_pos,
                                    self.FOV_DEG, self.VISION_RANGE, self.tile, blocks_vision)
+        self.vision["hidden"] = player_hidden
+        if player_hidden:
+            # a hidden player is only found by a hunter standing right next to them
+            self.vision["visible"] = self.vision["distance"] < self.HIDE_DETECT_DIST
         self.sees_player = self.vision["visible"]
         if self.sees_player:
             self.last_known_pos = player_pos
@@ -84,40 +104,83 @@ class Hunter:
 
     # ------------------------------------------------------------ main update
     def update(self, dt, walkable):
-        self._check_transitions(dt, walkable)      # 1. FSM: should we change state?
+        self._update_memory_and_suspicion(dt)
+        self._decide(walkable)                     # utility picks an action -> FSM changes state
         self.speed = self.SPEEDS[self.state]
         handlers = {PATROL: self._patrol, ALERT: self._alert, CHASE: self._chase,
                     SEARCH: self._search, RETURN: self._return}
-        handlers[self.state](dt, walkable)         # 2. do what the current state says
+        handlers[self.state](dt, walkable)         # do what the current state says
 
-    # ------------------------------------------------------------ transitions
+    # ------------------------------------------------------------ decision making
+    def _update_memory_and_suspicion(self, dt):
+        if self.sees_player:
+            self.time_since_seen = 0.0
+            self.memory_consumed = False
+        else:
+            self.time_since_seen += dt
+
+        gain = 0.0
+        if self.sees_player:
+            gain += 1.5
+        if self.heard:
+            gain += 0.6 * self.heard["intensity"]
+        self.suspicion += (gain - self.SUSPICION_DECAY) * dt
+        self.suspicion = max(0.0, min(1.0, self.suspicion))
+
+    def _gather_inputs(self):
+        """Turn what the hunter knows into the 0..1 inputs the utility system expects."""
+        proximity = 0.0
+        if self.sees_player and self.vision:
+            proximity = max(0.0, 1.0 - self.vision["distance"] / self.VISION_RANGE)
+
+        memory = 0.0
+        if self.last_known_pos is not None and not self.memory_consumed:
+            memory = max(0.0, 1.0 - self.time_since_seen / self.MEMORY_TIME)
+
+        recent = 1.0 if (self.last_known_pos is not None
+                         and self.time_since_seen < self.LOSE_SIGHT_TIME) else 0.0
+
+        return {
+            "visible": self.sees_player,
+            "proximity": proximity,
+            "sound": self.heard["intensity"] if self.heard else 0.0,
+            "memory": memory,
+            "recent_contact": recent,
+            "suspicion": self.suspicion,
+            "pending_investigation": self.state == ALERT,
+        }
+
+    def _decide(self, walkable):
+        current = STATE_ACTION[self.state]
+        self.scores = utility.score_actions(self._gather_inputs(), current)
+        best = utility.choose_action(self.scores)
+        self.action = best
+
+        if best == current:
+            # same action, but a new and distant noise retargets the investigation
+            if (best == utility.INVESTIGATE and self.heard
+                    and self._far(self.heard["pos"], self.alert_target, self.NEW_NOISE_DIST)):
+                self._start_alert(self.heard["pos"], walkable)
+            return
+
+        if best == utility.CHASE:
+            self._set_state(CHASE, "Player visible")
+        elif best == utility.INVESTIGATE:
+            self._start_alert(self.heard["pos"], walkable)
+        elif best == utility.SEARCH:
+            self._enter_search(walkable)
+        else:
+            self._start_return(walkable, "Nothing to follow up")
+
+    # ------------------------------------------------------------ state changes
     def _set_state(self, state, reason):
+        if self.state == SEARCH and state not in (SEARCH, CHASE):
+            self.memory_consumed = True    # we already acted on that memory
         self.state = state
         self.reason = reason
         self.path = []
         self.wait_timer = 0.0
         self.repath_timer = 0.0
-
-    def _check_transitions(self, dt, walkable):
-        # 1. seeing the player always means CHASE
-        if self.sees_player:
-            self.lost_sight_timer = 0.0
-            if self.state != CHASE:
-                self._set_state(CHASE, "Player spotted")
-            return
-
-        # 2. in CHASE, keep going a moment after losing sight, then SEARCH
-        if self.state == CHASE:
-            self.lost_sight_timer += dt
-            if self.lost_sight_timer >= self.LOSE_SIGHT_TIME:
-                self._enter_search(walkable)
-            return
-
-        # 3. a noise means ALERT (unless we're already heading to that spot)
-        if self.heard:
-            pos = self.heard["pos"]
-            if self.state != ALERT or self._far(pos, self.alert_target, self.NEW_NOISE_DIST):
-                self._start_alert(pos, walkable)
 
     def _start_alert(self, pos, walkable):
         self._set_state(ALERT, "Heard a noise")
@@ -128,9 +191,20 @@ class Hunter:
     def _enter_search(self, walkable):
         self._set_state(SEARCH, "Lost sight of the player")
         self.search_timer = self.SEARCH_TIME
-        bx, by = self._tile_of(self.last_known_pos)
-        # last known tile first, then 4 spots around it
-        self.search_points = [(bx, by), (bx + 3, by), (bx, by + 3), (bx - 3, by), (bx, by - 3)]
+        base = self._tile_of(self.last_known_pos)
+
+        # check the last known tile first, then the nearest hiding places around it
+        bushes = [b for b in self.hiding_spots
+                  if b != base and math.hypot(b[0] - base[0], b[1] - base[1]) <= 6]
+        bushes.sort(key=lambda b: math.hypot(b[0] - base[0], b[1] - base[1]))
+        self.search_points = [base] + bushes[:3]
+
+        # fill up with spots around the last known tile if there aren't enough bushes
+        for dx, dy in ((3, 0), (0, 3), (-3, 0), (0, -3)):
+            if len(self.search_points) >= 5:
+                break
+            self.search_points.append((base[0] + dx, base[1] + dy))
+
         self.search_index = 0
         self._plan_to(self.search_points[0], walkable)
 

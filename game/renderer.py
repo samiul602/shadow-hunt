@@ -27,7 +27,11 @@ def draw_world(screen, world):
             pygame.draw.rect(screen, (0, 0, 0), rect, 1)  # faint grid line
 
 def draw_player(screen, player):
-    color = (255, 220, 120) if player.sprinting else (240, 240, 240)
+    if player.hidden:
+        color = (30, 90, 45)   # blends into the bush
+    else:
+        color = (255, 220, 120) if player.sprinting else (240, 240, 240)
+    
     pygame.draw.rect(screen, color, player.rect)
     pygame.draw.rect(screen, (0, 0, 0), player.rect, 2)
 
@@ -161,3 +165,47 @@ STATE_COLORS = {
 def draw_state_label(screen, hunter):
     t = get_font(22).render(hunter.state, True, STATE_COLORS[hunter.state])
     screen.blit(t, t.get_rect(center=(round(hunter.x), round(hunter.y) + 24)))
+
+
+ACTION_ORDER = ["CHASE", "INVESTIGATE", "SEARCH", "PATROL"]
+
+
+def draw_ai_panel(screen, hunter, x=990, y=90):
+    white, grey = (255, 255, 255), (190, 190, 190)
+
+    screen.blit(get_font(30).render("HUNTER AI", True, white), (x, y))
+    y += 36
+    screen.blit(get_font(28).render(f"State: {hunter.state}", True, STATE_COLORS[hunter.state]), (x, y))
+    y += 28
+    screen.blit(get_font(22).render(hunter.reason, True, grey), (x, y))
+    y += 34
+
+    # suspicion bar
+    screen.blit(get_font(22).render("Suspicion", True, grey), (x, y))
+    pygame.draw.rect(screen, (50, 50, 50), (x + 110, y + 2, 120, 14))
+    pygame.draw.rect(screen, (230, 120, 60), (x + 110, y + 2, int(120 * hunter.suspicion), 14))
+    y += 36
+
+    # utility scores: the chosen action is highlighted
+    screen.blit(get_font(24).render("Utility scores", True, white), (x, y))
+    y += 28
+    for action in ACTION_ORDER:
+        score = hunter.scores[action]
+        picked = action == hunter.action
+        screen.blit(get_font(22).render(action, True, white if picked else grey), (x, y))
+        pygame.draw.rect(screen, (50, 50, 50), (x + 110, y + 2, 120, 14))
+        bar_color = (255, 220, 80) if picked else (110, 150, 200)
+        pygame.draw.rect(screen, bar_color, (x + 110, y + 2, int(120 * min(score, 1.0)), 14))
+        screen.blit(get_font(20).render(f"{score:.2f}", True, white), (x + 238, y))
+        y += 26    
+
+def draw_hint(screen, player, world):
+    col, row = int(player.pos.x // TILE), int(player.pos.y // TILE)
+    if player.hidden:
+        text = "Hidden - press E to come out"
+    elif world.tile_at(col, row) == "B":
+        text = "Press E to hide"
+    else:
+        return
+    t = get_font(24).render(text, True, (255, 255, 255))
+    screen.blit(t, (20, 650))        

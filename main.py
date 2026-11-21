@@ -6,7 +6,8 @@ from ai.hunter import Hunter
 from game.renderer import (draw_world, draw_player, draw_stamina_bar,
                            draw_keys, draw_key_counter, draw_message,
                            draw_hunter, draw_debug, draw_vision_cone,
-                             draw_alert_mark, draw_noise, draw_state_label)
+                           draw_alert_mark, draw_noise, draw_state_label,
+                           draw_ai_panel, draw_hint)
 
 from game.player import Player
 
@@ -27,7 +28,7 @@ def main():
     STONE_NOISE_RADIUS = 220   # how far a stone's noise carries
     won = False
     caught = False
-    hunter = Hunter(PATROL_POINTS[0], PATROL_POINTS, TILE)
+    hunter = Hunter(PATROL_POINTS[0], PATROL_POINTS, TILE, world.hiding_spots)
     show_debug = True
     stone_noises = []
 
@@ -43,7 +44,7 @@ def main():
             if event.type == pygame.KEYDOWN and event.key == pygame.K_r and (won or caught):
                 world = World(map_path)   # restart
                 player = Player(world.spawn)
-                hunter = Hunter(PATROL_POINTS[0], PATROL_POINTS, TILE)
+                hunter = Hunter(PATROL_POINTS[0], PATROL_POINTS, TILE, world.hiding_spots)
                 won = False
                 caught = False
                 stone_noises.clear()
@@ -58,14 +59,16 @@ def main():
                     target = player.pos + offset.normalize() * STONE_RANGE
                 stone_noises.append({"pos": (target.x, target.y),
                                     "radius": STONE_NOISE_RADIUS, "ttl": 0.5})
-                
+            
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_e and not (won or caught):
+                player.toggle_hide(world)    
 
         # 2. update 
         keys = pygame.key.get_pressed()
         player.update(dt, keys, world)  
         if not (won or caught):
             hunter.update(dt, world.is_walkable)
-            hunter.perceive((player.pos.x, player.pos.y), world.blocks_vision)
+            hunter.perceive((player.pos.x, player.pos.y), world.blocks_vision, player.hidden)
             player_noise = []
             if player.noise_radius > 0:
                 player_noise.append({"pos": (player.pos.x, player.pos.y),
@@ -99,8 +102,12 @@ def main():
         draw_stamina_bar(screen, player)
         draw_keys(screen, world)
         draw_key_counter(screen, world)
+        draw_hint(screen, player, world)
+        draw_ai_panel(screen, hunter)
         if won:
             draw_message(screen, "YOU ESCAPED!", "Press R to play again", (120, 255, 140))
+        if caught:
+            draw_message(screen, "CAUGHT!", "Press R to try again", (255, 90, 90))           
         pygame.display.flip()
 
     pygame.quit()

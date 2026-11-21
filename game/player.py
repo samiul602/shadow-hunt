@@ -20,11 +20,15 @@ class Player:
         self.exhausted = False
         self.sprinting = False
         self.moving = False
+        self.hidden = False
 
     def update(self, dt, keys, world):
         # 1. read input -> direction vector
         dx = (keys[pygame.K_d] or keys[pygame.K_RIGHT]) - (keys[pygame.K_a] or keys[pygame.K_LEFT])
         dy = (keys[pygame.K_s] or keys[pygame.K_DOWN]) - (keys[pygame.K_w] or keys[pygame.K_UP])
+        if self.hidden:
+            dx = dy = 0   # can't move (or sprint) while hiding
+
         direction = pygame.Vector2(dx, dy)
         moving = direction.length() > 0
         self.moving = moving
@@ -47,6 +51,18 @@ class Player:
         speed = self.SPRINT_SPEED if self.sprinting else self.WALK_SPEED
         self._move_axis(0, direction.x * speed * dt, world)
         self._move_axis(1, direction.y * speed * dt, world)
+
+    def toggle_hide(self, world):
+        """E key: hide in the bush you're standing on, or come out of it."""
+        if self.hidden:
+            self.hidden = False
+            return
+        col, row = int(self.pos.x // TILE), int(self.pos.y // TILE)
+        if world.tile_at(col, row) == "B":
+            self.hidden = True
+
+
+
     
     @property
     def noise_radius(self):

@@ -58,6 +58,11 @@ class World:
     def blocks_vision(self, col, row):
         return self.tile_at(col, row) in VISION_BLOCKERS
 
+    @property
+    def hiding_spots(self):
+        """All bush tiles (col, row): places the player can hide."""
+        return [(c, r) for r in range(self.rows) for c in range(self.cols)
+                if self.grid[r][c] == "B"]
     
     def collect_keys(self, player_rect):
         """Pick up any key the player is touching. Opens the gate at the last one."""
