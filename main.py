@@ -37,22 +37,23 @@ def main():
         # 1. events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_r and won:
-                    world = World(map_path)   # restart
-                    player = Player(world.spawn)
-                    hunter = Hunter(PATROL_POINTS[0], PATROL_POINTS, TILE)
-                    won = False
-                    if event.type == pygame.KEYDOWN and event.key == pygame.K_F1:
-                     show_debug = not show_debug  
-
-                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not won:
-                        target = pygame.Vector2(event.pos)
-                        offset = target - player.pos
-                        if offset.length() > STONE_RANGE:
-                            target = player.pos + offset.normalize() * STONE_RANGE
-                        stone_noises.append({"pos": (target.x, target.y),
-                                            "radius": STONE_NOISE_RADIUS, "ttl": 0.5})
                 running = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_r and won:
+                world = World(map_path)   # restart
+                player = Player(world.spawn)
+                hunter = Hunter(PATROL_POINTS[0], PATROL_POINTS, TILE)
+                won = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_F1:
+                    show_debug = not show_debug  
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not won:
+                target = pygame.Vector2(event.pos)
+                offset = target - player.pos
+                if offset.length() > STONE_RANGE:
+                    target = player.pos + offset.normalize() * STONE_RANGE
+                stone_noises.append({"pos": (target.x, target.y),
+                                    "radius": STONE_NOISE_RADIUS, "ttl": 0.5})
+                
 
         # 2. update 
         keys = pygame.key.get_pressed()
