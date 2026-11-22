@@ -182,10 +182,12 @@ def _reason_line(screen, label, value, color, x, y):
     screen.blit(get_font(22).render(value, True, color), (x + 150, y))
 
 
-def draw_ai_panel(screen, hunter, x=990, y=90):
+def draw_ai_panel(screen, hunter, index=1, total=1, x=990, y=90):
     white, grey = (255, 255, 255), (190, 190, 190)
 
-    screen.blit(get_font(30).render("HUNTER AI", True, white), (x, y))
+    title = "HUNTER AI" if total == 1 else f"HUNTER AI {index}/{total}  (Tab)"
+    screen.blit(get_font(30).render(title, True, white), (x, y))
+    
     y += 36
     screen.blit(get_font(28).render(f"State: {hunter.state}", True, STATE_COLORS[hunter.state]), (x, y))
     y += 28
